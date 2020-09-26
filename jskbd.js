@@ -24,16 +24,19 @@ const CANVAS_HEIGHT = MAX_KEYS * 8;
 //
 
 const DRAW_COLOR1      = 'color1'
-const DRAW_COLOR1_DOTS = 'color1-dots'
+const DRAW_COLOR1_LINE = 'color1-line'
 const DRAW_STRIPES     = 'stripes'
-const DRAW_COLOR2_DOTS = 'color2-dots'
+const DRAW_COLOR2_LINE = 'color2-line'
 
 //
 // References to elements
 //
 
+const gBody   = document.body;
+const gInput  = document.getElementById('input');
 const gCanvas = document.getElementById('display');
 const gContext = gCanvas.getContext('2d');
+const gFullscreenButton = document.getElementById('fullscreen-button');
 
 //
 // Internal structures
@@ -83,12 +86,25 @@ let gInputs  = null;
 let gPos     = 0;
 let gFrame   = 0;
 let gRunning = false;
+let gPixelsPerNote  = undefined;
+let gMiddleHeight   = undefined;
+let gMiddleOffset   = undefined;
+let gOrigBodyClass  = gBody.className;
+let gOrigInputClass = gInput.className;
+let gFullscreenOn   = false;
 
 // Initializes application. Always run first.
 function init() {
     // Set the internal drawing size of our canvas.
     gCanvas.width  = CANVAS_WIDTH;
     gCanvas.height = CANVAS_HEIGHT;
+
+    gFullscreenButton.onclick = toggleFullscreen;
+
+    // Pre-calculations.
+    gPixelsPerNote = gCanvas.height / MAX_KEYS;
+    gMiddleHeight  = gPixelsPerNote * 0.25;
+    gMiddleOffset  = (gPixelsPerNote - gMiddleHeight) / 2;
 
     // Activate MIDI.
     navigator
@@ -269,9 +285,9 @@ function volumeToNotch(volume) {
     // Determine style and interpolation.
     if (style === undefined && interpolation !== undefined) {
         style = (interpolation < 0.25) ? DRAW_COLOR1      :
-                (interpolation < 0.50) ? DRAW_COLOR1_DOTS :
+                (interpolation < 0.50) ? DRAW_COLOR1_LINE :
                 (interpolation < 0.75) ? DRAW_STRIPES     :
-                                         DRAW_COLOR2_DOTS;
+                                         DRAW_COLOR2_LINE;
     }
 
     return {
@@ -285,10 +301,6 @@ function volumeToNotch(volume) {
 
 // Draws a single line at the current position (gPos).
 function drawMidiLine() {
-    // Pre-calculations.
-    // TODO: can probably be calculated way earlier, but who cares! /shrug
-    let pixelsPerNote = gCanvas.height / MAX_KEYS;
-
     // Draw all keys.
     for (let i = 0; i < MAX_KEYS; i++) {
         // Skip keys that aren't pressed.
@@ -296,12 +308,12 @@ function drawMidiLine() {
             continue;
 
         // Calculate line positions.
-        let y1 = gCanvas.height - (pixelsPerNote * (i + 1));
-        let y2 = gCanvas.height - (pixelsPerNote * (i + 0));
+        let y1 = gCanvas.height - (gPixelsPerNote * (i + 1));
+        let y2 = gCanvas.height - (gPixelsPerNote * (i + 0));
 
         // Calculate position for small line in the middle of the big line.
-        let split1 = y1 + (pixelsPerNote / 2.0);
-        let split2 = split1 + 1;
+        let split1 = y1 + gMiddleOffset;
+        let split2 = y2 - gMiddleOffset;
 
         // Get all info for drawing.
         let notch = volumeToNotch(gKeys[i].volume);
@@ -313,7 +325,7 @@ function drawMidiLine() {
                 gContext.fillRect(gPos, y1, 1, y2 - y1);
                 break;
 
-            case DRAW_COLOR1_DOTS:
+            case DRAW_COLOR1_LINE:
                 gContext.fillStyle = notch.color1;
                 gContext.fillRect(gPos, y1,     1, split1 - y1);
                 gContext.fillRect(gPos, split2, 1, y2     - split2);
@@ -327,7 +339,7 @@ function drawMidiLine() {
                 gContext.fillRect(gPos, y1, 1, y2 - y1);
                 break;
 
-            case DRAW_COLOR2_DOTS:
+            case DRAW_COLOR2_LINE:
                 gContext.fillStyle = notch.color2;
                 gContext.fillRect(gPos, y1,     1, split1 - y1);
                 gContext.fillRect(gPos, split2, 1, y2     - split2);
@@ -367,6 +379,17 @@ function startRunning() {
 
     drawPositionLine();
     queueAnimFrame();
+}
+
+// Toggles the 'fullscreen' class for the <body> and #display elements.
+function toggleFullscreen() {
+    // Determine which class to append - 'fullscreen' or nothing.
+    gFullscreenOn = !gFullscreenOn;
+    let fsClass = (gFullscreenOn ? ' fullscreen' : '');
+
+    // Set classes.
+    gBody.className  = gOrigBodyClass  + fsClass;
+    gInput.className = gOrigInputClass + fsClass;
 }
 
 //
